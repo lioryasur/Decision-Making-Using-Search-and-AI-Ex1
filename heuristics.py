@@ -266,28 +266,33 @@ class BellmanUpdateHeuristic(LearnedHeuristic):
         neighbors = torch.stack([rolled_pos, rolled_neg, flipped], dim=1)
         return neighbors
 
-
 class BootstrappingHeuristic(LearnedHeuristic):
-    def __init__(self, n=11, k=4, dropout=0):
+    def __init__(self, n=11, k=4,dropout=0):
         super().__init__(n, k, dropout)
+        self.epoch = 0
+
 
     def save_model(self, path='', iteration=None):
         if iteration:
             super().save_model(path+f'bootstrapping_heuristic_{iteration}.pth')
-            torch.save(self.optimizer.state_dict(), path+f'bootstrapping_heuristi_optimizer{iteration}.pth')
+            torch.save(self._optimizer.state_dict(), path+f'bootstrapping_heuristi_optimizer_{iteration}.pth')
         else:
             super().save_model(path+f'bootstrapping_heuristic.pth')
 
     def load_model(self, path='', iteration=None):
         if iteration:
             super().load_model(path+f'bootstrapping_heuristic_{iteration}.pth')
-            self.optimizer.load_state_dict(torch.load(path+f'bootstrapping_heuristic_optimizer{iteration}.pth', map_location=self._device))
+            self._optimizer.load_state_dict(torch.load(path+f'bootstrapping_heuristic_optimizer_{iteration}.pth', map_location=self._device))
             self.epoch = iteration
         else:
-             super().load_model(path+f'bootstrapping_heuristic.pth')
-
+            super().load_model(path+f'bootstrapping_heuristic.pth')
+           
+            
     def run_bwa_star(self, start_state, W, B, T):
-        hb = BaseHeuristic(self._n, self._k).get_h_values
+        if self.epoch < 1000:
+            hb = BaseHeuristic(self._n, self._k).get_h_values
+        else:
+            hb = self.get_h_values
         result_path, _ = BWAS(start_state, W, B, hb, T, self._k)
 
         if result_path:
@@ -299,9 +304,10 @@ class BootstrappingHeuristic(LearnedHeuristic):
         training_examples = []
 
         while len(training_examples) < batch_size:
-            minibatch = self.generate_batch_states(m=m, batch_size=batch_size // 100)
+            minibatch = self.generate_batch_states(m=m, batch_size=batch_size//100)
             minibatch = minibatch.to("cpu")
             solved_paths = []
+
 
             for state in minibatch:
                 solved, path = self.run_bwa_star(list(state), W, B, T)
@@ -327,10 +333,13 @@ class BootstrappingHeuristic(LearnedHeuristic):
         outputs_tensor = torch.tensor(outputs, dtype=torch.float32).to(self._device)
         self.train_model_real(inputs_tensor, outputs_tensor, epochs=61)
 
+
     def train_bootstrap(self, batch_size, initial_T=100, W=1.5, B=10, num_epochs=10, path=''):
-        for epoch in range(num_epochs):
-            print(f'Epoch {epoch + 1}/{num_epochs}')
-            self.bootstrap(int(math.log(epoch + 1, 1.15)), batch_size, initial_T, W, B)
+        for epoch in range(self.epoch, self.epoch+num_epochs):
+            print(f'Epoch {epoch+1}/{num_epochs}')
+            self.bootstrap(int(math.log(epoch+1, 1.15)), batch_size, initial_T, W, B)
             if epoch % 50 == 0:
-                print("saved!")
-                self.save_model(path=path, iteration=epoch)
+              print("saved!")
+              self.save_model(path=path, iteration=epoch)
+
+

@@ -161,18 +161,23 @@ class BellmanUpdateHeuristic(LearnedHeuristic):
     def load_model(self, path='', iteration=''):
         super().load_model(path + f'bellman_update_heuristic{iteration}.pth')
 
-    def train_iterations(self, save_path='', iterations=1001, batch_size=3000):
+    def train_iterations(self, save_path='', iterations=1001, batch_size=5000):
         test_problem = [1, 7, 10, 3, 6, 9, 5, 8, 2, 4, 11]
+        test_object = TopSpinState(test_problem)
         for iteration in range(iterations):
             print(f'Iteration {iteration}')
             #states, labels = self.get_states_and_labels(batch_size, m=int(iterations // 3))
             states, labels = self.get_states_and_labels(batch_size, m=max(1,int(np.emath.logn(1.15, iterations))))
             self.train_model_real(states, labels, 31)
             if iteration % 20 == 0:
-                self._model.to('cpu')
-                path, num_expanded = BWAS(test_problem, 5, 10, self.get_h_values, 2000)
-                print(f'Easy problem expansions: {num_expanded}')
-                self._model.to(self._device)
+                with torch.no_grad():
+                    self._model.to('cpu')
+                    self._model.eval()
+                    print(f'start1 heuristic: {self.get_h_values([test_object])} (Base Heuristic is 10, real is 29)')
+                    path, num_expanded = BWAS(test_problem, 5, 10, self.get_h_values, 2000)
+                    print(f'Easy problem expansions: {num_expanded}')
+                    self._model.to(self._device)
+                    self._model.train()
             if iteration % 50 == 0:
                 self.save_model(path=save_path, iteration=iteration)
 
@@ -199,8 +204,10 @@ class BellmanUpdateHeuristic(LearnedHeuristic):
         non_goal_indices = ~goal_matches & ~goal_in_neighbors
         non_goal_neighbors = all_neighbors[non_goal_indices].to(self._device)
         non_goal_neighbors_flat = non_goal_neighbors.view(-1, self._n)
+        self._model.eval()
         with torch.no_grad():
             neighbor_hs = self._model(non_goal_neighbors_flat.to(self._device, dtype=torch.float))
+        self._model.train()
         neighbor_hs = neighbor_hs.view(-1, 3)
 
         min_neighbor_hs, _ = torch.min(neighbor_hs, dim=1)

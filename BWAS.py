@@ -86,7 +86,6 @@ def BWAS(start, W, B, heuristic_function, T, k=4):
     while (num_expansions <= T) and (not open.empty()):
       generated = []
       batch_expansions = 0
-      batch_LB = np.inf
       while (not open.empty()) and (num_expansions <= T) and (batch_expansions < B):
         _, n = open.get()
         s, g, p, f = n.s, n.g, n.p, n.f

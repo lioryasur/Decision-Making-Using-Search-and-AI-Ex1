@@ -106,6 +106,7 @@ class LearnedHeuristic:
         self._goal = list(range(1, n + 1))
         self._device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self._model.to(self._device)
+        self._epoch = 0
 
     def get_h_values(self, states):
         self._model.eval()
@@ -175,7 +176,6 @@ class LearnedHeuristic:
         batch_states = []
 
         # Generate random actions for the entire batch at once
-        #action_counts = np.clip(np.round(np.random.normal(m, 3, batch_size)), a_min=0, a_max=np.inf).astype(int)
         action_counts = rng.integers(0, m, size=batch_size)
         for i in range(batch_size):
             state = goal_tensor.clone()
@@ -193,35 +193,36 @@ class BellmanUpdateHeuristic(LearnedHeuristic):
     def save_model(self, path='', iteration=None):
         if iteration:
             super().save_model(path + f'bootstrapping_heuristic_{iteration}.pth')
-            torch.save(self._optimizer.state_dict(), path + f'bootstrapping_heuristi_optimizer{iteration}.pth')
+            torch.save(self._optimizer.state_dict(), path + f'bootstrapping_heuristic_optimizer_{iteration}.pth')
         else:
             super().save_model(path + f'bootstrapping_heuristic.pth')
 
     def load_model(self, path='', iteration=None):
         if iteration:
-            super().load_model(path + f'bootstrapping_heuristic_{iteration}.pth')
+            super().load_model(path + f'bellman_update_heuristic_{iteration}.pth')
             self._optimizer.load_state_dict(
-                torch.load(path + f'bootstrapping_heuristic_optimizer{iteration}.pth', map_location=self._device))
-            self._epoch = iteration
+                torch.load(path + f'bellman_update_heuristic_optimizer_{iteration}.pth', map_location=self._device))
+            self._epoch = iteration+1
         else:
             super().load_model(path + f'bootstrapping_heuristic.pth')
 
     def train_iterations(self, save_path='', iterations=1001, batch_size=5000):
-        test_problem = [1, 7, 10, 3, 6, 9, 5, 8, 2, 4, 11]
+        self._model.train()
+        test_problem = [5, 4, 7, 8, 3, 10, 6, 1, 11, 9, 2]
         test_object = TopSpinState(test_problem)
         for iteration in range(iterations):
-            print(f'Iteration {iteration}')
-            states, labels = self.get_states_and_labels(batch_size, m=max(1, int(np.emath.logn(1.15, iterations))))
+            print(f'Iteration {iteration+self._epoch}')
+            states, labels = self.get_states_and_labels(batch_size, m=max(1, int(np.emath.logn(1.15, iterations+self._epoch))))
             self.train_model_real(states, labels, 31)
             if iteration % 200 == 0:
                 with torch.no_grad():
                     self._model.eval()
-                    print(f'start1 heuristic: {self.get_h_values([test_object])} (Base Heuristic is 10, real is 29)')
-                    path, num_expanded = BWAS(test_problem, 5, 10, self.get_h_values, 2000)
-                    print(f'Easy problem expansions: {num_expanded}')
+                    print(f'start1 heuristic: {self.get_h_values([test_object])}, real is 26 or lower)')
+                    path, num_expanded = BWAS(test_problem, 5, 1, self.get_h_values, 2000)
+                    print(f'Easy problem expansions: {num_expanded}, took 490 for bellman and 54 for bootstrap')
                     self._model.train()
             if iteration % 100 == 0:
-                self.save_model(path=save_path, iteration=iteration)
+                self.save_model(path=save_path, iteration=self._epoch+iteration)
 
     def get_states_and_labels(self, batch_size, m):
         states = self.generate_batch_states(m, batch_size)
@@ -269,13 +270,13 @@ class BellmanUpdateHeuristic(LearnedHeuristic):
 class BootstrappingHeuristic(LearnedHeuristic):
     def __init__(self, n=11, k=4,dropout=0):
         super().__init__(n, k, dropout)
-        self.epoch = 0
+
 
 
     def save_model(self, path='', iteration=None):
         if iteration:
             super().save_model(path+f'bootstrapping_heuristic_{iteration}.pth')
-            torch.save(self._optimizer.state_dict(), path+f'bootstrapping_heuristi_optimizer_{iteration}.pth')
+            torch.save(self._optimizer.state_dict(), path+f'bootstrapping_heuristic_optimizer_{iteration}.pth')
         else:
             super().save_model(path+f'bootstrapping_heuristic.pth')
 

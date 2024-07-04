@@ -1,16 +1,12 @@
 from heuristics import *
 
 
-def bellmanUpdateTraining(bellman_update_heuristic, path='./'):
+def bellmanUpdateTraining(bellman_update_heuristic, path='./', iterations=1001):
     bellman = bellman_update_heuristic(dropout=0.3)
-    bellman.load_model(path='../', iteration=4400)
-    bellman.train_iterations(path, iterations=40001)
+    bellman.train_iterations(path, iterations=iterations)
 
 
-def bootstrappingTraining(bootstrapping_heuristic, path='./'):
+def bootstrappingTraining(bootstrapping_heuristic, path='./', iterations=1001):
     bootstrap = bootstrapping_heuristic()
-    bootstrap.train_bootstrap(path=path, batch_size=5000, initial_T=2000, W=1.5, B=10, num_epochs=2000, )
+    bootstrap.train_bootstrap(path=path, batch_size=5000, initial_T=2000, W=1.5, B=10, num_epochs=iterations)
 
-
-if __name__ == '__main__':
-    bellmanUpdateTraining(BellmanUpdateHeuristic, path='../')
